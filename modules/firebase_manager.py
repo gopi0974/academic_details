@@ -10,12 +10,17 @@ KEY_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'fir
 db = None
 firebase_initialized = False
 firebase_disabled = False
+firebase_error_msg = None
+
+def get_firebase_error_msg():
+    global firebase_error_msg
+    return firebase_error_msg
 
 import streamlit as st
 
 def initialize_firebase():
     """Initializes Firebase Admin SDK using credentials from secrets, environment variables, or local file."""
-    global db, firebase_initialized, firebase_disabled
+    global db, firebase_initialized, firebase_disabled, firebase_error_msg
     if firebase_disabled:
         return False
     if firebase_initialized:
@@ -57,6 +62,7 @@ def initialize_firebase():
                     except Exception:
                         pass
     except Exception as e:
+        firebase_error_msg = f"Secrets load failed: {e}"
         print(f"Could not load Firebase from Streamlit secrets: {e}")
         
     # 2. Try loading from environment variable
@@ -67,6 +73,7 @@ def initialize_firebase():
                 cred_dict = json.loads(env_key)
                 cred = credentials.Certificate(cred_dict)
         except Exception as e:
+            firebase_error_msg = f"Environment load failed: {e}"
             print(f"Could not load Firebase from environment variable: {e}")
             
     # 3. Fallback to local credential key file
@@ -74,7 +81,15 @@ def initialize_firebase():
         try:
             cred = credentials.Certificate(KEY_PATH)
         except Exception as e:
+            firebase_error_msg = f"Local file failed: {e}"
             print(f"Error loading Firebase local key file: {e}")
+
+    if not cred and not firebase_error_msg:
+        # Check if secrets.toml exists but has no keys
+        if hasattr(st, "secrets") and len(st.secrets) > 0:
+            firebase_error_msg = f"Secrets found but none contain 'type' = 'service_account'. Keys: {list(st.secrets.keys())}"
+        else:
+            firebase_error_msg = "No Firebase secrets or key file found. Operating in Local JSON mode."
 
     if cred:
         try:
@@ -85,8 +100,10 @@ def initialize_firebase():
                 firebase_admin.initialize_app(cred)
             db = firestore.client()
             firebase_initialized = True
+            firebase_error_msg = None
             return True
         except Exception as e:
+            firebase_error_msg = f"Firebase initialization failed: {e}"
             print(f"Error initializing Firebase SDK: {e}")
             return False
             

@@ -196,7 +196,7 @@ else:
     faculty = st.session_state.faculty_user
     role = faculty.get('role', 'faculty')
     
-    from modules.firebase_manager import is_firebase_active
+    from modules.firebase_manager import is_firebase_active, get_firebase_error_msg
     fb_active = is_firebase_active()
     fb_badge = '<span style="display: inline-block; background-color: #F59E0B; color: black; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; margin-top: 8px; margin-left: 5px;">🔥 Firebase Active</span>' if fb_active else '<span style="display: inline-block; background-color: #64748B; color: white; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; margin-top: 8px; margin-left: 5px;">💾 Local JSON</span>'
     
@@ -217,6 +217,9 @@ else:
         """,
         unsafe_allow_html=True
     )
+
+    if not fb_active:
+        st.sidebar.warning(f"⚠️ Firebase connection state:\n{get_firebase_error_msg()}")
 
     # Preload local SMTP configuration states
     if 'smtp_config' not in st.session_state:
