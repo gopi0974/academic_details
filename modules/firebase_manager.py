@@ -25,9 +25,37 @@ def initialize_firebase():
     
     # 1. Try loading from Streamlit secrets (Production Cloud)
     try:
-        if hasattr(st, "secrets") and "firebase" in st.secrets:
-            cred_dict = dict(st.secrets["firebase"])
-            cred = credentials.Certificate(cred_dict)
+        if hasattr(st, "secrets"):
+            if "firebase" in st.secrets:
+                cred_dict = dict(st.secrets["firebase"])
+                cred = credentials.Certificate(cred_dict)
+            elif "FIREBASE_KEY" in st.secrets:
+                val = st.secrets["FIREBASE_KEY"]
+                try:
+                    cred_dict = json.loads(val)
+                except Exception:
+                    cred_dict = dict(val)
+                cred = credentials.Certificate(cred_dict)
+            else:
+                # Scan all secret keys to see if any value is a dictionary or JSON string with "type": "service_account"
+                for key in st.secrets.keys():
+                    try:
+                        val = st.secrets[key]
+                        if isinstance(val, str):
+                            try:
+                                parsed = json.loads(val)
+                                if isinstance(parsed, dict) and parsed.get("type") == "service_account":
+                                    cred = credentials.Certificate(parsed)
+                                    break
+                            except Exception:
+                                pass
+                        elif hasattr(val, "get") or isinstance(val, dict):
+                            val_dict = dict(val)
+                            if val_dict.get("type") == "service_account":
+                                cred = credentials.Certificate(val_dict)
+                                break
+                    except Exception:
+                        pass
     except Exception as e:
         print(f"Could not load Firebase from Streamlit secrets: {e}")
         
